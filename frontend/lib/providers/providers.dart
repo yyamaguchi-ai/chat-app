@@ -86,6 +86,7 @@ class MessagesNotifier extends FamilyAsyncNotifier<List<MessageModel>, int> {
 
   void addMessage(MessageModel message) {
     state.whenData((messages) {
+      if (messages.any((existing) => existing.id == message.id)) return;
       state = AsyncData([...messages, message]);
     });
   }

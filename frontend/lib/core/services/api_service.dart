@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  static const _baseUrl = 'https://supreme-cod-r74wxg54qr94f5xvr-8000.app.github.dev/api';
+  static const _baseUrl = 'http://localhost:8000/api';
   static const _tokenKey = 'auth_token';
 
   late final Dio _dio;

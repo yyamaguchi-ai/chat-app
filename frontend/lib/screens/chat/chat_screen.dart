@@ -1,7 +1,7 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../../core/services/pusher_service.dart';
 import '../../data/models/models.dart';
 import '../../providers/providers.dart';
 
@@ -19,20 +19,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _messageCtrl = TextEditingController();
   final _scrollCtrl  = ScrollController();
   bool _isSending    = false;
-  Timer? _timer;
+  late final PusherService _pusherService;
 
   @override
   void initState() {
     super.initState();
-    // 3秒ごとに自動更新
-    _timer = Timer.periodic(const Duration(seconds: 3), (_) {
-      ref.invalidate(messagesProvider(widget.roomId));
+    _pusherService = PusherService();
+    _pusherService.subscribeRoom(widget.roomId, (payload) {
+      if (!mounted) return;
+      final message = MessageModel.fromJson(payload['message'] as Map<String, dynamic>);
+      ref.read(messagesProvider(widget.roomId).notifier).addMessage(message);
+      _scrollToBottom();
     });
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _pusherService.unsubscribeRoom(widget.roomId);
+    _pusherService.dispose();
     _messageCtrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();

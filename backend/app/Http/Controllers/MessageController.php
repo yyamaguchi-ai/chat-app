@@ -42,8 +42,26 @@ class MessageController extends Controller
             'type'         => $validated['type'] ?? 'text',
             'reply_to_id'  => $validated['reply_to_id'] ?? null,
         ]);
-
+        
         $message->load(['user', 'replyTo.user']);
+
+        if (env('PUSHER_APP_KEY') && env('PUSHER_APP_SECRET') && env('PUSHER_APP_ID')) {
+            $pusher = new \Pusher\Pusher(
+                env('PUSHER_APP_KEY'),
+                env('PUSHER_APP_SECRET'),
+                env('PUSHER_APP_ID'),
+                [
+                    'cluster' => env('PUSHER_APP_CLUSTER'),
+                    'useTLS' => true,
+                ]
+            );
+
+            $pusher->trigger(
+                "chat-room.{$chatRoom->id}",
+                'message.created',
+                ['message' => $message->toArray()]
+            );
+        }
 
         return response()->json($message, 201);
     }
