@@ -81,7 +81,8 @@ class MessagesNotifier extends FamilyAsyncNotifier<List<MessageModel>, int> {
     final api = ref.read(apiServiceProvider);
     final data = await api.getMessages(roomId);
     final items = (data['data'] as List).map((m) => MessageModel.fromJson(m)).toList();
-    return items.reversed.toList();
+    items.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    return items;
   }
 
   void addMessage(MessageModel message) {

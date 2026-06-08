@@ -20,18 +20,27 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _scrollCtrl       = ScrollController();
   bool _isSending         = false;
   bool _initialScrollDone = false;
+  bool _userScrolledUp    = false;
   late final PusherService _pusherService;
 
   @override
   void initState() {
     super.initState();
+
+    // ユーザーが上にスクロールしているかを常時追跡
+    _scrollCtrl.addListener(() {
+      if (!_scrollCtrl.hasClients) return;
+      _userScrolledUp =
+          _scrollCtrl.position.pixels < _scrollCtrl.position.maxScrollExtent - 80;
+    });
+
     _pusherService = PusherService();
     _pusherService.subscribeRoom(widget.roomId, (payload) {
       if (!mounted) return;
       final message = MessageModel.fromJson(payload['message'] as Map<String, dynamic>);
-      final wasAtBottom = _isAtBottom();
       ref.read(messagesProvider(widget.roomId).notifier).addMessage(message);
-      if (wasAtBottom) _scrollToBottom();
+      // 最下部にいる場合のみスクロール
+      if (!_userScrolledUp) _scrollToBottom();
     });
   }
 
@@ -42,11 +51,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _messageCtrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();
-  }
-
-  bool _isAtBottom() {
-    if (!_scrollCtrl.hasClients) return true;
-    return _scrollCtrl.position.pixels >= _scrollCtrl.position.maxScrollExtent - 80;
   }
 
   void _scrollToBottom() {
@@ -67,6 +71,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     setState(() => _isSending = true);
     _messageCtrl.clear();
     try {
+      _userScrolledUp = false; // 自分の送信後は必ず最下部へ
       await ref.read(messagesProvider(widget.roomId).notifier).sendMessage(widget.roomId, text);
       _scrollToBottom();
     } catch (e) {
@@ -94,6 +99,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(child: Text('エラー: $e')),
               data: (messages) {
+                // 初回ロード時のみ最下部へ即時ジャンプ
                 if (!_initialScrollDone && messages.isNotEmpty) {
                   _initialScrollDone = true;
                   WidgetsBinding.instance.addPostFrameCallback((_) {
