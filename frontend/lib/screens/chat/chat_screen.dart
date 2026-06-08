@@ -18,7 +18,8 @@ class ChatScreen extends ConsumerStatefulWidget {
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _messageCtrl = TextEditingController();
   final _scrollCtrl  = ScrollController();
-  bool _isSending    = false;
+  bool _isSending           = false;
+  bool _initialScrollDone   = false;
   late final PusherService _pusherService;
 
   @override
@@ -29,7 +30,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       if (!mounted) return;
       final message = MessageModel.fromJson(payload['message'] as Map<String, dynamic>);
       ref.read(messagesProvider(widget.roomId).notifier).addMessage(message);
-      _scrollToBottom();
     });
   }
 
@@ -78,6 +78,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final me        = ref.watch(authProvider).valueOrNull;
     final msgsAsync = ref.watch(messagesProvider(widget.roomId));
 
+    ref.listen(messagesProvider(widget.roomId), (prev, next) {
+      if (!_initialScrollDone && next.hasValue) {
+        _initialScrollDone = true;
+        _scrollToBottom();
+      }
+    });
+
     return Scaffold(
       appBar: AppBar(title: Text(widget.roomName), centerTitle: false),
       body: Column(
@@ -87,7 +94,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(child: Text('エラー: $e')),
               data: (messages) {
-                _scrollToBottom();
                 return ListView.builder(
                   controller: _scrollCtrl,
                   padding: const EdgeInsets.symmetric(vertical: 8),
