@@ -8,12 +8,24 @@ import '../screens/home/home_screen.dart';
 import '../screens/chat/chat_screen.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
+  final notifier = _RouterNotifier();
+
+  // authProviderの状態が変わるたびにGoRouterにリダイレクト再評価を通知
+  ref.listen(authProvider, (_, __) => notifier.notify());
+  ref.onDispose(notifier.dispose);
+
   return GoRouter(
     initialLocation: '/',
+    refreshListenable: notifier,
     redirect: (context, state) {
       final authState = ref.read(authProvider);
-      final isLoggedIn = authState.valueOrNull != null;
+
+      // 認証確認中はリダイレクトしない（ローカルのトークン検証を待つ）
+      if (authState.isLoading) return null;
+
+      final isLoggedIn  = authState.valueOrNull != null;
       final isAuthRoute = state.uri.path == '/login' || state.uri.path == '/register';
+
       if (!isLoggedIn && !isAuthRoute) return '/login';
       if (isLoggedIn && isAuthRoute) return '/';
       return null;
@@ -25,7 +37,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/chat/:roomId',
         builder: (context, state) {
-          final roomId = int.parse(state.pathParameters['roomId']!);
+          final roomId  = int.parse(state.pathParameters['roomId']!);
           final roomName = state.uri.queryParameters['name'] ?? 'チャット';
           return ChatScreen(roomId: roomId, roomName: roomName);
         },
@@ -33,3 +45,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+
+class _RouterNotifier extends ChangeNotifier {
+  void notify() => notifyListeners();
+}
