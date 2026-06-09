@@ -21,7 +21,7 @@ class UserController extends Controller
             ->limit(20)
             ->get()
             ->map(fn($u) => array_merge($u->toArray(), ['is_online' => $u->is_online]));
-
+            
         return response()->json($users);
     }
 }

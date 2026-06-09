@@ -58,6 +58,8 @@ final authProvider = AsyncNotifierProvider<AuthNotifier, UserModel?>(AuthNotifie
 class RoomsNotifier extends AsyncNotifier<List<ChatRoomModel>> {
   @override
   Future<List<ChatRoomModel>> build() async {
+    final auth = ref.watch(authProvider);
+    if (auth.valueOrNull == null) return [];
     final api = ref.read(apiServiceProvider);
     final rooms = await api.getRooms();
     return rooms.map((r) => ChatRoomModel.fromJson(r)).toList();

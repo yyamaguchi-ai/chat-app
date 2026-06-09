@@ -8,8 +8,9 @@ import '../../providers/providers.dart';
 class ChatScreen extends ConsumerStatefulWidget {
   final int roomId;
   final String roomName;
+  final bool isGroup;
 
-  const ChatScreen({super.key, required this.roomId, required this.roomName});
+  const ChatScreen({super.key, required this.roomId, required this.roomName, this.isGroup = false});
 
   @override
   ConsumerState<ChatScreen> createState() => _ChatScreenState();
@@ -41,13 +42,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       ref.read(messagesProvider(widget.roomId).notifier).addMessage(message);
       // 最下部にいる場合のみスクロール
       if (!_userScrolledUp) _scrollToBottom();
-    });
+    }).catchError((_) {});
   }
 
   @override
   void dispose() {
-    _pusherService.unsubscribeRoom(widget.roomId);
-    _pusherService.dispose();
+    _pusherService.unsubscribeRoom(widget.roomId).catchError((_) {});
+    _pusherService.dispose().catchError((_) {});
     _messageCtrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();
@@ -63,6 +64,96 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         );
       }
     });
+  }
+
+  void _showAddMember(BuildContext ctx) {
+    final searchCtrl    = TextEditingController();
+    final selectedUsers = <UserModel>[];
+    List<UserModel> searchResults = [];
+
+    showModalBottomSheet(
+      context: ctx,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => StatefulBuilder(
+        builder: (ctx2, setModalState) => Padding(
+          padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(ctx).viewInsets.bottom + 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text('メンバーを招待', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              TextField(
+                controller: searchCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'ユーザーを検索',
+                  prefixIcon: Icon(Icons.search),
+                ),
+                onChanged: (q) async {
+                  if (q.length < 2) {
+                    setModalState(() => searchResults = []);
+                    return;
+                  }
+                  final results = await ref.read(apiServiceProvider).searchUsers(q);
+                  setModalState(() {
+                    searchResults = results.map((u) => UserModel.fromJson(u)).toList();
+                  });
+                },
+              ),
+              if (searchResults.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                ...searchResults.map((u) => ListTile(
+                  dense: true,
+                  leading: CircleAvatar(radius: 16, child: Text(u.name[0].toUpperCase())),
+                  title: Text(u.name),
+                  subtitle: Text(u.email),
+                  trailing: selectedUsers.any((s) => s.id == u.id)
+                      ? const Icon(Icons.check_circle, color: Color(0xFF6C63FF))
+                      : const Icon(Icons.add_circle_outline),
+                  onTap: () {
+                    setModalState(() {
+                      if (selectedUsers.any((s) => s.id == u.id)) {
+                        selectedUsers.removeWhere((s) => s.id == u.id);
+                      } else {
+                        selectedUsers.add(u);
+                      }
+                    });
+                  },
+                )),
+              ],
+              if (selectedUsers.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: selectedUsers.map((u) => Chip(
+                    label: Text(u.name),
+                    onDeleted: () => setModalState(() => selectedUsers.removeWhere((s) => s.id == u.id)),
+                  )).toList(),
+                ),
+              ],
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: selectedUsers.isEmpty ? null : () async {
+                  await ref.read(apiServiceProvider).addMembers(
+                    widget.roomId,
+                    selectedUsers.map((u) => u.id).toList(),
+                  );
+                  if (ctx.mounted) {
+                    Navigator.of(ctx).pop();
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(content: Text('メンバーを招待しました')),
+                    );
+                  }
+                },
+                child: const Text('招待する'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _sendMessage() async {
@@ -91,7 +182,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final msgsAsync = ref.watch(messagesProvider(widget.roomId));
 
     return Scaffold(
-      appBar: AppBar(title: Text(widget.roomName), centerTitle: false),
+      appBar: AppBar(
+        title: Text(widget.roomName),
+        centerTitle: false,
+        actions: [
+          if (widget.isGroup)
+            IconButton(
+              icon: const Icon(Icons.person_add_rounded),
+              onPressed: () => _showAddMember(context),
+            ),
+        ],
+      ),
       body: Column(
         children: [
           Expanded(
@@ -121,8 +222,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               },
             ),
           ),
+          
           Container(
-            padding: EdgeInsets.fromLTRB(12, 8, 12, MediaQuery.of(context).viewInsets.bottom + 8),
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
             decoration: BoxDecoration(
               color: Theme.of(context).scaffoldBackgroundColor,
               boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 10, offset: const Offset(0, -2))],

@@ -51,37 +51,97 @@ class HomeScreen extends ConsumerWidget {
   }
 
   void _showCreateGroup(BuildContext ctx, WidgetRef ref) {
-    final nameCtrl = TextEditingController();
+    final nameCtrl      = TextEditingController();
+    final searchCtrl    = TextEditingController();
+    final selectedUsers = <UserModel>[];
+    List<UserModel> searchResults = [];
+
     showModalBottomSheet(
       context: ctx,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => Padding(
-        padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(ctx).viewInsets.bottom + 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text('グループを作成', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            TextField(controller: nameCtrl,
-              decoration: const InputDecoration(labelText: 'グループ名', prefixIcon: Icon(Icons.group))),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () async {
-                if (nameCtrl.text.trim().isEmpty) return;
-                final api = ref.read(apiServiceProvider);
-                final room = await api.createGroupRoom(name: nameCtrl.text.trim());
-                await ref.read(roomsProvider.notifier).refresh();
-                if (ctx.mounted) {
-                  Navigator.of(ctx).pop();
-                  ctx.push('/chat/${room['id']}?name=${Uri.encodeComponent(nameCtrl.text.trim())}');
-                }
-              },
-              child: const Text('作成する'),
-            ),
-          ],
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => StatefulBuilder(
+        builder: (ctx2, setModalState) => Padding(
+          padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(ctx).viewInsets.bottom + 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text('グループを作成', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              TextField(
+                controller: nameCtrl,
+                decoration: const InputDecoration(labelText: 'グループ名', prefixIcon: Icon(Icons.group)),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: searchCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'メンバーを検索',
+                  prefixIcon: Icon(Icons.search),
+                ),
+                onChanged: (q) async {
+                  if (q.length < 2) {
+                    setModalState(() => searchResults = []);
+                    return;
+                  }
+                  final results = await ref.read(apiServiceProvider).searchUsers(q);
+                  setModalState(() {
+                    searchResults = results.map((u) => UserModel.fromJson(u)).toList();
+                  });
+                },
+              ),
+              if (searchResults.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                ...searchResults.map((u) => ListTile(
+                  dense: true,
+                  leading: CircleAvatar(radius: 16, child: Text(u.name[0].toUpperCase())),
+                  title: Text(u.name),
+                  subtitle: Text(u.email),
+                  trailing: selectedUsers.any((s) => s.id == u.id)
+                      ? const Icon(Icons.check_circle, color: Color(0xFF6C63FF))
+                      : const Icon(Icons.add_circle_outline),
+                  onTap: () {
+                    setModalState(() {
+                      if (selectedUsers.any((s) => s.id == u.id)) {
+                        selectedUsers.removeWhere((s) => s.id == u.id);
+                      } else {
+                        selectedUsers.add(u);
+                      }
+                    });
+                  },
+                )),
+              ],
+              if (selectedUsers.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: selectedUsers.map((u) => Chip(
+                    label: Text(u.name),
+                    onDeleted: () => setModalState(() => selectedUsers.removeWhere((s) => s.id == u.id)),
+                  )).toList(),
+                ),
+              ],
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () async {
+                  if (nameCtrl.text.trim().isEmpty) return;
+                  final api  = ref.read(apiServiceProvider);
+                  final room = await api.createGroupRoom(
+                    name: nameCtrl.text.trim(),
+                    memberIds: selectedUsers.map((u) => u.id).toList(),
+                  );
+                  await ref.read(roomsProvider.notifier).refresh();
+                  if (ctx.mounted) {
+                    Navigator.of(ctx).pop();
+                    ctx.push('/chat/${room['id']}?name=${Uri.encodeComponent(nameCtrl.text.trim())}&type=group');
+                  }
+                },
+                child: const Text('作成する'),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -115,7 +175,7 @@ class _RoomTile extends StatelessWidget {
               child: Text('${room.unreadCount}',
                   style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)))
           : null,
-      onTap: () => context.push('/chat/${room.id}?name=${Uri.encodeComponent(room.name)}'),
+      onTap: () => context.push('/chat/${room.id}?name=${Uri.encodeComponent(room.name)}&type=${room.type}'),
     );
   }
 }
@@ -164,7 +224,7 @@ class _UserSearchDelegate extends SearchDelegate<void> {
                 await ref.read(roomsProvider.notifier).refresh();
                 if (ctx.mounted) {
                   close(ctx, null);
-                  ctx.push('/chat/${room['id']}?name=${Uri.encodeComponent(u.name)}');
+                  ctx.push('/chat/${room['id']}?name=${Uri.encodeComponent(u.name)}&type=direct');
                 }
               },
             );

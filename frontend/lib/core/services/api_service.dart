@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  static const _baseUrl = 'http://localhost:8000/api';
+  static const _baseUrl = 'http://172.16.10.74:8000/api';
   static const _tokenKey = 'auth_token';
 
   late final Dio _dio;
@@ -86,6 +86,11 @@ class ApiService {
     required int roomId, required String content,
   }) async {
     final res = await _dio.post('/rooms/$roomId/messages', data: {'content': content, 'type': 'text'});
+    return res.data;
+  }
+
+  Future<Map<String, dynamic>> addMembers(int roomId, List<int> userIds) async {
+    final res = await _dio.post('/rooms/$roomId/members', data: {'user_ids': userIds});
     return res.data;
   }
 

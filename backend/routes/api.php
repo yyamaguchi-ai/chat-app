@@ -20,6 +20,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/group',                [ChatRoomController::class, 'createGroup']);
         Route::get('/{chatRoom}',            [ChatRoomController::class, 'show']);
         Route::delete('/{chatRoom}/leave',   [ChatRoomController::class, 'leave']);
+        Route::post('/{chatRoom}/members',   [ChatRoomController::class, 'addMembers']);
         Route::get('/{chatRoom}/messages',   [MessageController::class, 'index']);
         Route::post('/{chatRoom}/messages',  [MessageController::class, 'store']);
     });

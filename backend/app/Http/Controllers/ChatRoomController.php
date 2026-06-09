@@ -51,7 +51,7 @@ class ChatRoomController extends Controller
             $me->id         => ['role' => 'admin'],
             $targetUser->id => ['role' => 'member'],
         ]);
-
+        
         return response()->json($room->load('members'), 201);
     }
 
@@ -86,6 +86,29 @@ class ChatRoomController extends Controller
     public function show(Request $request, ChatRoom $chatRoom): JsonResponse
     {
         abort_unless($chatRoom->members()->where('user_id', $request->user()->id)->exists(), 403);
+        return response()->json($chatRoom->load('members'));
+    }
+
+    public function addMembers(Request $request, ChatRoom $chatRoom): JsonResponse
+    {
+        abort_unless($chatRoom->members()->where('user_id', $request->user()->id)->exists(), 403);
+
+        $request->validate([
+            'user_ids'   => 'required|array',
+            'user_ids.*' => 'exists:users,id',
+        ]);
+
+        $newMembers = [];
+        foreach ($request->user_ids as $userId) {
+            if (!$chatRoom->members()->where('user_id', $userId)->exists()) {
+                $newMembers[$userId] = ['role' => 'member'];
+            }
+        }
+
+        if (!empty($newMembers)) {
+            $chatRoom->members()->attach($newMembers);
+        }
+
         return response()->json($chatRoom->load('members'));
     }
 

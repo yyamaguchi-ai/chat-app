@@ -1,0 +1,3 @@
+-dontwarn org.slf4j.**
+-dontwarn javax.annotation.**
+-dontwarn com.pusher.**

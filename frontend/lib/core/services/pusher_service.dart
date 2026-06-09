@@ -1,41 +1,42 @@
 import 'dart:convert';
 
-import 'package:pusher_client/pusher_client.dart';
+import 'package:pusher_channels_flutter/pusher_channels_flutter.dart';
 
 class PusherService {
-  static const _appKey = 'YOUR_PUSHER_APP_KEY';
-  static const _cluster = 'YOUR_PUSHER_APP_CLUSTER';
+  static const _appKey    = 'YOUR_PUSHER_APP_KEY';
+  static const _cluster   = 'YOUR_PUSHER_APP_CLUSTER';
 
-  late final PusherClient _pusher;
-  Channel? _channel;
+  final _pusher = PusherChannelsFlutter.getInstance();
 
-  PusherService() {
-    final options = PusherOptions(cluster: _cluster, encrypted: true);
-    _pusher = PusherClient(_appKey, options, autoConnect: true, enableLogging: false);
+  Future<void> subscribeRoom(int roomId, void Function(Map<String, dynamic>) onMessageCreated) async {
+    await _pusher.init(
+      apiKey:  _appKey,
+      cluster: _cluster,
+    );
+    await _pusher.subscribe(
+      channelName: 'chat-room.$roomId',
+      onEvent: (event) {
+        if (event.eventName != 'message.created') return;
+        final data = event.data;
+        if (data == null) return;
+        final payload = jsonDecode(data is String ? data : jsonEncode(data));
+        if (payload is Map<String, dynamic>) {
+          onMessageCreated(payload);
+        }
+      },
+    );
+    await _pusher.connect();
   }
 
-  void subscribeRoom(int roomId, void Function(Map<String, dynamic> payload) onMessageCreated) {
-    _channel = _pusher.subscribe('chat-room.$roomId');
-    _channel?.bind('message.created', (event) {
-      if (event?.data == null) return;
-      final payload = jsonDecode(event!.data!);
-      if (payload is Map<String, dynamic>) {
-        onMessageCreated(payload);
-      }
-    });
+  Future<void> unsubscribeRoom(int roomId) async {
+    try {
+      await _pusher.unsubscribe(channelName: 'chat-room.$roomId');
+    } catch (_) {}
   }
 
-  void unsubscribeRoom(int roomId) {
-    if (_channel != null) {
-      _channel?.unbind('message.created');
-      _pusher.unsubscribe('chat-room.$roomId');
-      _channel = null;
-    }
-  }
-
-  void dispose() {
-    _channel?.unbind('message.created');
-    _pusher.unsubscribeAll();
-    _pusher.disconnect();
+  Future<void> dispose() async {
+    try {
+      await _pusher.disconnect();
+    } catch (_) {}
   }
 }
