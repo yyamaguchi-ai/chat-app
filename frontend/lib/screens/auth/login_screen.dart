@@ -11,10 +11,11 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _formKey   = GlobalKey<FormState>();
-  final _emailCtrl = TextEditingController();
-  final _passCtrl  = TextEditingController();
-  bool _obscure    = true;
+  final _formKey      = GlobalKey<FormState>();
+  final _emailCtrl    = TextEditingController();
+  final _passCtrl     = TextEditingController();
+  bool _obscure       = true;
+  String? _serverError;
 
   @override
   void dispose() {
@@ -24,6 +25,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _login() async {
+    setState(() => _serverError = null);
     if (!_formKey.currentState!.validate()) return;
     await ref.read(authProvider.notifier).login(
           email: _emailCtrl.text.trim(),
@@ -32,9 +34,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (mounted) {
       final error = ref.read(authProvider).error;
       if (error != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.toString()), backgroundColor: Colors.red),
-        );
+        setState(() => _serverError = error.toString());
       } else {
         context.go('/');
       }
@@ -92,7 +92,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 16),
+                if (_serverError != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.error_outline, color: Colors.red.shade700, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _serverError!,
+                            style: TextStyle(color: Colors.red.shade700, fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 16),
                 SizedBox(
                   height: 52,
                   child: ElevatedButton(

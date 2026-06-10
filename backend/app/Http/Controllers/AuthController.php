@@ -61,4 +61,16 @@ class AuthController extends Controller
         $request->user()->update(['last_seen_at' => now()]);
         return response()->json($request->user());
     }
+
+    public function updateProfile(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'name'  => 'sometimes|string|max:100',
+            'phone' => 'nullable|string|max:20',
+        ]);
+
+        $request->user()->update($validated);
+
+        return response()->json($request->user()->fresh());
+    }
 }

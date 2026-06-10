@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/services/api_service.dart';
 import '../../data/models/models.dart';
 import '../../providers/providers.dart';
+import '../profile/profile_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -10,10 +12,26 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final roomsAsync = ref.watch(roomsProvider);
+    final me         = ref.watch(authProvider).valueOrNull;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('チャット'),
+        leading: GestureDetector(
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const ProfileScreen()),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: CircleAvatar(
+              backgroundColor: const Color(0xFF6C63FF),
+              child: Text(
+                me != null && me.name.isNotEmpty ? me.name[0].toUpperCase() : '?',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+            ),
+          ),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.search),
@@ -30,7 +48,7 @@ class HomeScreen extends ConsumerWidget {
       ),
       body: roomsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('エラー: $e')),
+        error: (e, _) => Center(child: Text(ApiService.parseError(e))),
         data: (rooms) => rooms.isEmpty
             ? const Center(child: Text('チャットルームがありません\n右上の検索からユーザーを探しましょう',
                 textAlign: TextAlign.center))

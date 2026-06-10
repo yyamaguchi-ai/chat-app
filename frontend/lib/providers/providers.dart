@@ -20,11 +20,13 @@ class AuthNotifier extends AsyncNotifier<UserModel?> {
 
   Future<void> login({required String email, required String password}) async {
     state = const AsyncLoading();
-    state = await AsyncValue.guard(() async {
-      final api = ref.read(apiServiceProvider);
+    try {
+      final api  = ref.read(apiServiceProvider);
       final data = await api.login(email: email, password: password);
-      return UserModel.fromJson(data['user']);
-    });
+      state = AsyncData(UserModel.fromJson(data['user']));
+    } catch (e) {
+      state = AsyncError(ApiService.parseError(e), StackTrace.current);
+    }
   }
 
   Future<void> register({
@@ -34,22 +36,30 @@ class AuthNotifier extends AsyncNotifier<UserModel?> {
     required String passwordConfirmation,
   }) async {
     state = const AsyncLoading();
-    state = await AsyncValue.guard(() async {
-      final api = ref.read(apiServiceProvider);
+    try {
+      final api  = ref.read(apiServiceProvider);
       final data = await api.register(
         name: name,
         email: email,
         password: password,
         passwordConfirmation: passwordConfirmation,
       );
-      return UserModel.fromJson(data['user']);
-    });
+      state = AsyncData(UserModel.fromJson(data['user']));
+    } catch (e) {
+      state = AsyncError(ApiService.parseError(e), StackTrace.current);
+    }
   }
 
   Future<void> logout() async {
     final api = ref.read(apiServiceProvider);
     await api.logout();
     state = const AsyncData(null);
+  }
+
+  Future<void> updateProfile({String? name, String? phone}) async {
+    final api = ref.read(apiServiceProvider);
+    final data = await api.updateProfile(name: name, phone: phone);
+    state = AsyncData(UserModel.fromJson(data));
   }
 }
 

@@ -60,6 +60,14 @@ class ApiService {
     return res.data;
   }
 
+  Future<Map<String, dynamic>> updateProfile({String? name, String? phone}) async {
+    final res = await _dio.put('/profile', data: {
+      if (name != null) 'name': name,
+      'phone': phone,
+    });
+    return res.data;
+  }
+
   Future<List<dynamic>> getRooms() async {
     final res = await _dio.get('/rooms');
     return res.data;
@@ -107,5 +115,31 @@ class ApiService {
   Future<void> _saveToken(String token) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_tokenKey, token);
+  }
+
+  static String parseError(Object e) {
+    if (e is DioException) {
+      // ネットワーク系エラー
+      switch (e.type) {
+        case DioExceptionType.connectionTimeout:
+        case DioExceptionType.receiveTimeout:
+          return '接続がタイムアウトしました';
+        case DioExceptionType.connectionError:
+          return 'ネットワークに接続できません';
+        default:
+          break;
+      }
+      // サーバーからのエラーレスポンス
+      final data = e.response?.data;
+      if (data is Map) {
+        if (data['errors'] is Map) {
+          final errors = data['errors'] as Map;
+          final first  = errors.values.first;
+          if (first is List && first.isNotEmpty) return first[0].toString();
+        }
+        if (data['message'] != null) return data['message'].toString();
+      }
+    }
+    return 'エラーが発生しました';
   }
 }

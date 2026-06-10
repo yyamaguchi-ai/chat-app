@@ -3,6 +3,7 @@ class UserModel {
   final String name;
   final String email;
   final String? avatar;
+  final String? phone;
   final bool isOnline;
 
   const UserModel({
@@ -10,6 +11,7 @@ class UserModel {
     required this.name,
     required this.email,
     this.avatar,
+    this.phone,
     this.isOnline = false,
   });
 
@@ -18,6 +20,7 @@ class UserModel {
         name: json['name'],
         email: json['email'],
         avatar: json['avatar'],
+        phone: json['phone'],
         isOnline: json['is_online'] ?? false,
       );
 }

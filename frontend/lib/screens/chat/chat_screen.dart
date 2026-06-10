@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../../core/services/api_service.dart';
 import '../../core/services/pusher_service.dart';
 import '../../data/models/models.dart';
 import '../../providers/providers.dart';
@@ -168,7 +169,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('送信に失敗しました: $e'), backgroundColor: Colors.red));
+          SnackBar(content: Text(ApiService.parseError(e)), backgroundColor: Colors.red));
         _messageCtrl.text = text;
       }
     } finally {
@@ -198,7 +199,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           Expanded(
             child: msgsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('エラー: $e')),
+              error: (e, _) => Center(child: Text(ApiService.parseError(e))),
               data: (messages) {
                 // 初回ロード時のみ最下部へ即時ジャンプ
                 if (!_initialScrollDone && messages.isNotEmpty) {
