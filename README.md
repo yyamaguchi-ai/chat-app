@@ -143,19 +143,33 @@ flutter run -d chrome
 
 ### 方法 2：GitHub Codespaces で確認する
 
+> **注意**：Codespaces は**この PC に**Git・Docker・Flutter をインストールしなくて済む方法です。ただし Codespaces の環境（クラウド上の Linux）に Flutter などを毎回セットアップする必要があります。起動のたびに手順が必要なため、手軽さでは方法1（ローカルの Chrome）の方が上です。
+
 1. GitHub のリポジトリページを開く
 2. 「Code」→「Codespaces」→「Create codespace on main」
-3. ブラウザ上で VS Code が起動したら以下を実行：
+3. ブラウザ上で VS Code が起動したら以下を順番に実行：
 
+**バックエンドのセットアップ**
 ```bash
 docker compose up -d
+docker compose exec php composer install
 docker compose exec php php artisan key:generate
 docker compose exec php php artisan migrate
+```
+
+**Flutter のインストール（Codespaces 環境内に毎回必要）**
+```bash
+git clone https://github.com/flutter/flutter.git -b stable ~/.flutter
+export PATH="$PATH:$HOME/.flutter/bin"
+flutter precache --web
+```
+
+**アプリの起動**
+```bash
 cd frontend
 flutter run -d chrome
 ```
 
-- **ローカルに何もインストール不要**でブラウザだけで動作確認できます
 - エミュレーターは使用できないため Chrome のみになります
 - `.env` と `pusher_service.dart` のキー設定は別途必要です
 
