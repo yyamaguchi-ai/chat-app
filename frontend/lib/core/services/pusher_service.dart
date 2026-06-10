@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'package:pusher_channels_flutter/pusher_channels_flutter.dart';
 
 class PusherService {
-  static const _appKey    = 'YOUR_PUSHER_APP_KEY';
-  static const _cluster   = 'YOUR_PUSHER_APP_CLUSTER';
+  static const _appKey    = '12ebcea7a3b9ebfc009f';
+  static const _cluster   = 'ap3';
 
   final _pusher = PusherChannelsFlutter.getInstance();
 
