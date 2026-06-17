@@ -177,10 +177,13 @@ class _RoomTile extends StatelessWidget {
       leading: CircleAvatar(
         radius: 28,
         backgroundColor: const Color(0xFF6C63FF).withOpacity(0.15),
-        child: room.type == 'group'
-            ? const Icon(Icons.group, color: Color(0xFF6C63FF))
-            : Text(room.name.isNotEmpty ? room.name[0].toUpperCase() : '?',
-                style: const TextStyle(color: Color(0xFF6C63FF), fontWeight: FontWeight.bold, fontSize: 18)),
+        backgroundImage: room.avatar != null ? NetworkImage(room.avatar!) : null,
+        child: room.avatar != null
+            ? null
+            : room.type == 'group'
+                ? const Icon(Icons.group, color: Color(0xFF6C63FF))
+                : Text(room.name.isNotEmpty ? room.name[0].toUpperCase() : '?',
+                    style: const TextStyle(color: Color(0xFF6C63FF), fontWeight: FontWeight.bold, fontSize: 18)),
       ),
       title: Text(room.name, style: const TextStyle(fontWeight: FontWeight.w600)),
       subtitle: Text(room.latestMessage?.content ?? '（メッセージなし）',

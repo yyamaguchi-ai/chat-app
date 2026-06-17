@@ -8,7 +8,12 @@ class PusherService {
 
   final _pusher = PusherChannelsFlutter.getInstance();
 
-  Future<void> subscribeRoom(int roomId, void Function(Map<String, dynamic>) onMessageCreated) async {
+  Future<void> subscribeRoom(
+    int roomId,
+    void Function(Map<String, dynamic>) onMessageCreated, {
+    void Function(Map<String, dynamic>)? onRoomDissolved,
+    void Function(Map<String, dynamic>)? onRoomUpdated,
+  }) async {
     await _pusher.init(
       apiKey:  _appKey,
       cluster: _cluster,
@@ -16,12 +21,20 @@ class PusherService {
     await _pusher.subscribe(
       channelName: 'chat-room.$roomId',
       onEvent: (event) {
-        if (event.eventName != 'message.created') return;
         final data = event.data;
         if (data == null) return;
         final payload = jsonDecode(data is String ? data : jsonEncode(data));
-        if (payload is Map<String, dynamic>) {
-          onMessageCreated(payload);
+        if (payload is! Map<String, dynamic>) return;
+        switch (event.eventName) {
+          case 'message.created':
+            onMessageCreated(payload);
+            break;
+          case 'room.dissolved':
+            onRoomDissolved?.call(payload);
+            break;
+          case 'room.updated':
+            onRoomUpdated?.call(payload);
+            break;
         }
       },
     );

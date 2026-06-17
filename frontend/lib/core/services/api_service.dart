@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -97,8 +98,58 @@ class ApiService {
     return res.data;
   }
 
+  Future<Map<String, dynamic>> sendFile(int roomId, String filePath, String fileName) async {
+    final formData = FormData.fromMap({
+      'file': await MultipartFile.fromFile(filePath, filename: fileName),
+    });
+    final res = await _dio.post('/rooms/$roomId/messages', data: formData);
+    return res.data;
+  }
+
+  Future<Map<String, dynamic>> sendFileBytes(int roomId, Uint8List bytes, String fileName) async {
+    final formData = FormData.fromMap({
+      'file': MultipartFile.fromBytes(bytes, filename: fileName),
+    });
+    final res = await _dio.post('/rooms/$roomId/messages', data: formData);
+    return res.data;
+  }
+
   Future<Map<String, dynamic>> addMembers(int roomId, List<int> userIds) async {
     final res = await _dio.post('/rooms/$roomId/members', data: {'user_ids': userIds});
+    return res.data;
+  }
+
+  Future<Map<String, dynamic>> getRoom(int roomId) async {
+    final res = await _dio.get('/rooms/$roomId');
+    return res.data;
+  }
+
+  Future<void> leaveRoom(int roomId) async {
+    await _dio.delete('/rooms/$roomId/leave');
+  }
+
+  Future<void> dissolveRoom(int roomId) async {
+    await _dio.delete('/rooms/$roomId');
+  }
+
+  Future<Map<String, dynamic>> updateRoomName(int roomId, String name) async {
+    final res = await _dio.put('/rooms/$roomId', data: {'name': name});
+    return res.data;
+  }
+
+  Future<Map<String, dynamic>> updateRoomAvatar(int roomId, String filePath, String fileName) async {
+    final formData = FormData.fromMap({
+      'avatar': await MultipartFile.fromFile(filePath, filename: fileName),
+    });
+    final res = await _dio.post('/rooms/$roomId/avatar', data: formData);
+    return res.data;
+  }
+
+  Future<Map<String, dynamic>> updateRoomAvatarBytes(int roomId, Uint8List bytes, String fileName) async {
+    final formData = FormData.fromMap({
+      'avatar': MultipartFile.fromBytes(bytes, filename: fileName),
+    });
+    final res = await _dio.post('/rooms/$roomId/avatar', data: formData);
     return res.data;
   }
 

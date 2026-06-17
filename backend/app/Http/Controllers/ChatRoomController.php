@@ -114,7 +114,69 @@ class ChatRoomController extends Controller
 
     public function leave(Request $request, ChatRoom $chatRoom): JsonResponse
     {
+        abort_unless($chatRoom->type === 'group', 422, '個別チャットは退出できません。');
         $chatRoom->members()->detach($request->user()->id);
-        return response()->json(['message' => 'ルームを退出しました。']);
+        return response()->json(['message' => 'グループを退出しました。']);
+    }
+
+    public function destroy(Request $request, ChatRoom $chatRoom): JsonResponse
+    {
+        abort_unless($chatRoom->type === 'group', 422, 'グループのみ解散できます。');
+        abort_unless(
+            $chatRoom->members()
+                ->where('user_id', $request->user()->id)
+                ->wherePivot('role', 'admin')
+                ->exists(),
+            403,
+            '管理者のみグループを解散できます。'
+        );
+
+        $this->broadcast($chatRoom, 'room.dissolved', ['chat_room_id' => $chatRoom->id]);
+        $chatRoom->delete();
+
+        return response()->json(['message' => 'グループを解散しました。']);
+    }
+
+    public function update(Request $request, ChatRoom $chatRoom): JsonResponse
+    {
+        abort_unless($chatRoom->type === 'group', 422, 'グループのみ名前を変更できます。');
+        abort_unless($chatRoom->members()->where('user_id', $request->user()->id)->exists(), 403);
+
+        $validated = $request->validate(['name' => 'required|string|max:100']);
+        $chatRoom->update(['name' => $validated['name']]);
+
+        $this->broadcast($chatRoom, 'room.updated', ['name' => $chatRoom->name, 'avatar' => $chatRoom->avatar]);
+
+        return response()->json($chatRoom);
+    }
+
+    public function updateAvatar(Request $request, ChatRoom $chatRoom): JsonResponse
+    {
+        abort_unless($chatRoom->members()->where('user_id', $request->user()->id)->exists(), 403);
+
+        $request->validate(['avatar' => 'required|image|max:5120']);
+
+        $path = $request->file('avatar')->store('room-avatars', 'public');
+        $chatRoom->update(['avatar' => url('api/storage/' . $path)]);
+
+        $this->broadcast($chatRoom, 'room.updated', ['name' => $chatRoom->name, 'avatar' => $chatRoom->avatar]);
+
+        return response()->json($chatRoom);
+    }
+
+    private function broadcast(ChatRoom $chatRoom, string $event, array $data): void
+    {
+        if (!env('PUSHER_APP_KEY') || !env('PUSHER_APP_SECRET') || !env('PUSHER_APP_ID')) {
+            return;
+        }
+
+        $pusher = new \Pusher\Pusher(
+            env('PUSHER_APP_KEY'),
+            env('PUSHER_APP_SECRET'),
+            env('PUSHER_APP_ID'),
+            ['cluster' => env('PUSHER_APP_CLUSTER'), 'useTLS' => true]
+        );
+
+        $pusher->trigger("chat-room.{$chatRoom->id}", $event, $data);
     }
 }

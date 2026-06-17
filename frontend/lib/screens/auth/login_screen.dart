@@ -56,7 +56,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 const SizedBox(height: 60),
                 const Icon(Icons.chat_bubble_rounded, size: 72, color: Color(0xFF6C63FF)),
                 const SizedBox(height: 16),
-                Text('Chat App', textAlign: TextAlign.center,
+                Text('Work Chat', textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.bold, color: const Color(0xFF6C63FF))),
                 const SizedBox(height: 8),

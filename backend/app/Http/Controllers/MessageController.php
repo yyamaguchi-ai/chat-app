@@ -30,16 +30,28 @@ class MessageController extends Controller
         abort_unless($chatRoom->members()->where('user_id', $request->user()->id)->exists(), 403);
 
         $validated = $request->validate([
-            'content'     => 'required|string|max:5000',
-            'type'        => 'nullable|in:text,image,file',
+            'content'     => 'nullable|string|max:5000',
+            'type'        => 'nullable|in:text,image,file,audio',
             'reply_to_id' => 'nullable|exists:messages,id',
+            'file'        => 'nullable|file|max:20480',
         ]);
+
+        $fileUrl = null;
+        $type    = $validated['type'] ?? 'text';
+
+        if ($request->hasFile('file')) {
+            $path    = $request->file('file')->store('messages', 'public');
+            $fileUrl = url('api/storage/' . $path);
+            $mime    = $request->file('file')->getMimeType();
+            $type    = str_starts_with($mime, 'image/') ? 'image' : (str_starts_with($mime, 'audio/') ? 'audio' : 'file');
+        }
 
         $message = Message::create([
             'chat_room_id' => $chatRoom->id,
             'user_id'      => $request->user()->id,
-            'content'      => $validated['content'],
-            'type'         => $validated['type'] ?? 'text',
+            'content'      => $validated['content'] ?? ($request->hasFile('file') ? $request->file('file')->getClientOriginalName() : ''),
+            'type'         => $type,
+            'file_url'     => $fileUrl,
             'reply_to_id'  => $validated['reply_to_id'] ?? null,
         ]);
         

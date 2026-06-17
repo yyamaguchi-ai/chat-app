@@ -1,6 +1,16 @@
+import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/services/api_service.dart';
+import '../core/services/pusher_service.dart';
 import '../data/models/models.dart';
+
+class RoomEvent {
+  final int roomId;
+  final String type;
+  final Map<String, dynamic> payload;
+  const RoomEvent(this.roomId, this.type, this.payload);
+}
 
 final apiServiceProvider = Provider<ApiService>((ref) => ApiService());
 
@@ -66,13 +76,21 @@ class AuthNotifier extends AsyncNotifier<UserModel?> {
 final authProvider = AsyncNotifierProvider<AuthNotifier, UserModel?>(AuthNotifier.new);
 
 class RoomsNotifier extends AsyncNotifier<List<ChatRoomModel>> {
+  final PusherService _pusher = PusherService();
+  final Set<int> _subscribedRoomIds = {};
+  final _eventsController = StreamController<RoomEvent>.broadcast();
+
+  Stream<RoomEvent> get events => _eventsController.stream;
+
   @override
   Future<List<ChatRoomModel>> build() async {
     final auth = ref.watch(authProvider);
     if (auth.valueOrNull == null) return [];
     final api = ref.read(apiServiceProvider);
     final rooms = await api.getRooms();
-    return rooms.map((r) => ChatRoomModel.fromJson(r)).toList();
+    final list = rooms.map((r) => ChatRoomModel.fromJson(r)).toList();
+    _subscribeAll(list);
+    return list;
   }
 
   Future<void> refresh() async {
@@ -80,12 +98,64 @@ class RoomsNotifier extends AsyncNotifier<List<ChatRoomModel>> {
     state = await AsyncValue.guard(() async {
       final api = ref.read(apiServiceProvider);
       final rooms = await api.getRooms();
-      return rooms.map((r) => ChatRoomModel.fromJson(r)).toList();
+      final list = rooms.map((r) => ChatRoomModel.fromJson(r)).toList();
+      _subscribeAll(list);
+      return list;
+    });
+  }
+
+  // chat-room.{id} チャンネルはプラグイン側がチャンネル名で1つしか持てないため、
+  // 部屋一覧が読み込まれたタイミングで一括して購読を行う（チャット画面側では購読しない）。
+  void _subscribeAll(List<ChatRoomModel> rooms) {
+    for (final room in rooms) {
+      if (!_subscribedRoomIds.add(room.id)) continue;
+      _pusher.subscribeRoom(
+        room.id,
+        (payload) {
+          final message = MessageModel.fromJson(payload['message'] as Map<String, dynamic>);
+          ref.read(messagesProvider(room.id).notifier).addMessage(message);
+        },
+        onRoomDissolved: (payload) {
+          _eventsController.add(RoomEvent(room.id, 'dissolved', payload));
+          state.whenData((rooms) {
+            state = AsyncData(rooms.where((r) => r.id != room.id).toList());
+          });
+        },
+        onRoomUpdated: (payload) {
+          _eventsController.add(RoomEvent(room.id, 'updated', payload));
+          state.whenData((rooms) {
+            final index = rooms.indexWhere((r) => r.id == room.id);
+            if (index == -1) return;
+            final updated = rooms[index].copyWith(
+              name: payload['name'] as String?,
+              avatar: payload['avatar'] as String?,
+            );
+            final newList = [...rooms];
+            newList[index] = updated;
+            state = AsyncData(newList);
+          });
+        },
+      ).catchError((_) {});
+    }
+  }
+
+  void updateLatestMessage(int roomId, MessageModel message) {
+    state.whenData((rooms) {
+      final index = rooms.indexWhere((r) => r.id == roomId);
+      if (index == -1) return;
+      final updated = rooms[index].copyWith(latestMessage: message);
+      final reordered = [...rooms]..removeAt(index);
+      reordered.insert(0, updated);
+      state = AsyncData(reordered);
     });
   }
 }
 
 final roomsProvider = AsyncNotifierProvider<RoomsNotifier, List<ChatRoomModel>>(RoomsNotifier.new);
+
+final roomEventsProvider = StreamProvider<RoomEvent>((ref) {
+  return ref.watch(roomsProvider.notifier).events;
+});
 
 class MessagesNotifier extends FamilyAsyncNotifier<List<MessageModel>, int> {
   @override
@@ -102,11 +172,24 @@ class MessagesNotifier extends FamilyAsyncNotifier<List<MessageModel>, int> {
       if (messages.any((existing) => existing.id == message.id)) return;
       state = AsyncData([...messages, message]);
     });
+    ref.read(roomsProvider.notifier).updateLatestMessage(arg, message);
   }
 
   Future<void> sendMessage(int roomId, String content) async {
     final api = ref.read(apiServiceProvider);
     final data = await api.sendMessage(roomId: roomId, content: content);
+    addMessage(MessageModel.fromJson(data));
+  }
+
+  Future<void> sendFile(int roomId, String filePath, String fileName) async {
+    final api = ref.read(apiServiceProvider);
+    final data = await api.sendFile(roomId, filePath, fileName);
+    addMessage(MessageModel.fromJson(data));
+  }
+
+  Future<void> sendFileBytes(int roomId, Uint8List bytes, String fileName) async {
+    final api = ref.read(apiServiceProvider);
+    final data = await api.sendFileBytes(roomId, bytes, fileName);
     addMessage(MessageModel.fromJson(data));
   }
 }
